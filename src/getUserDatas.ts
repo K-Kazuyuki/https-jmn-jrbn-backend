@@ -1,10 +1,7 @@
 import { Env } from './index';
-const getUserDatas = async (env: Env): Promise<any> => {
-	const { DB } = env;
-	const session = await DB.prepare('SELECT * FROM User').bind().all();
-	return new Response(JSON.stringify(session), {
-		headers: { 'Content-Type': 'application/json' },
-	});
+const getUserDatas = async (request: Request, env: Env): Promise<any> => {
+	const session = await env.DB.prepare('SELECT * FROM User').bind().all();
+	return session.results;
 };
 
 export default getUserDatas;

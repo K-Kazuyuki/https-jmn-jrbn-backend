@@ -3,6 +3,7 @@
 ## ref
 
 - [cloudflare d1](https://zenn.dev/kameoncloud/articles/6264967e5fd1da)
+- `wrangler d1 execute DB --remote --file jrbn_init.sql`
 
 ## Database
 

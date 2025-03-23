@@ -12,6 +12,7 @@
  */
 
 import createGameSession from './createGameSession';
+import getUserDatas from './getUserDatas';
 
 export interface Env {
 	DB: D1Database;
@@ -22,12 +23,14 @@ export default {
 		const url = new URL(request.url);
 		try {
 			switch (url.pathname) {
-				case '/message':
+				case '/api/message':
 					return Response.json('Hello, World!');
-				case '/random':
+				case '/api/random':
 					return Response.json(crypto.randomUUID());
-				case '/createGameSession':
-					return await createGameSession(env as Env);
+				case '/api/createGameSession':
+					return Response.json(await createGameSession(request, env));
+				case '/api/getUserDatas':
+					return Response.json(await getUserDatas(request, env));
 				default:
 					return Response.json('Not Found', { status: 404 });
 			}
