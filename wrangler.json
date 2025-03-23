@@ -1,0 +1,14 @@
+{
+	"d1_databases": [
+		{
+			"binding": "DBTEST",
+			"database_name": "firstd1",
+			"database_id": "b040b40e-acd2-4c59-b50c-f45a200e896c"
+		},
+		{
+			"binding": "DB",
+			"database_name": "jrbnd1",
+			"database_id": "b21f1ef0-60d7-4918-965a-21118c68afb9"
+		}
+	]
+}
