@@ -11,7 +11,7 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-import createGameSession from "./createGameSession";
+import createGameSession from './createGameSession';
 
 export interface Env {
 	DB: D1Database;
@@ -20,15 +20,19 @@ export interface Env {
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
-		switch (url.pathname) {
-			case '/message':
-				return Response.json('Hello, World!');
-			case '/random':
-				return Response.json(crypto.randomUUID());
-			case '/createGameSession':
-				return await createGameSession(env as Env);
-			default:
-				return Response.json('Not Found', { status: 404 });
+		try {
+			switch (url.pathname) {
+				case '/message':
+					return Response.json('Hello, World!');
+				case '/random':
+					return Response.json(crypto.randomUUID());
+				case '/createGameSession':
+					return await createGameSession(env as Env);
+				default:
+					return Response.json('Not Found', { status: 404 });
+			}
+		} catch (e: any) {
+			return Response.json(e.message, { status: 500 });
 		}
 	},
 } satisfies ExportedHandler<Env>;

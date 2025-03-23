@@ -1,5 +1,5 @@
 import { Env } from './index';
-const createGameSession = async (env: Env): Promise<any> => {
+const getUserDatas = async (env: Env): Promise<any> => {
 	const { DB } = env;
 	const session = await DB.prepare('SELECT * FROM User').bind().all();
 	return new Response(JSON.stringify(session), {
@@ -7,4 +7,4 @@ const createGameSession = async (env: Env): Promise<any> => {
 	});
 };
 
-export default createGameSession;
+export default getUserDatas;
