@@ -1,5 +1,26 @@
 import { Env } from './index';
 
+type RequestBody = {
+	gameName: string;
+	playerName: string;
+	userLimit: number;
+	timeLimit: number;
+	userId?: number;
+};
+
+const validateRequestBody = (body: any): body is RequestBody => {
+	// gameName と playerName のインジェクション
+	return (
+		typeof body === 'object' &&
+		body !== null &&
+		typeof body.gameName === 'string' &&
+		typeof body.playerName === 'string' &&
+		typeof body.userLimit === 'number' &&
+		typeof body.timeLimit === 'number' &&
+		(body.userId === undefined || typeof body.userId === 'number')
+	);
+};
+
 const createGameSession = async (request: Request, env: Env): Promise<any> => {
 	try {
 		console.log('Request body:', request.body); // Log the raw body to verify the data
@@ -7,22 +28,56 @@ const createGameSession = async (request: Request, env: Env): Promise<any> => {
 			return { error: 'Request body is empty' }; // リクエストボディが空の場合のエラー処理
 		}
 		const requestBody = await request.json(); // Parse the JSON body
-		if (!requestBody || Object.keys(requestBody).length === 0) {
-			return { error: 'Request body is empty or invalid JSON' }; // JSONパース後の空チェック
+		if (!validateRequestBody(requestBody)) {
+			return { error: 'Invalid request body' }; // リクエストボディが不正な場合のエラー処理
 		}
+		const userId = requestBody.userId ?? 1;
+
+		// Check if the user exists in the User table
+		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(userId).all();
+		if (userExists.results.length === 0) {
+			return { error: 'User does not exist' }; // エラー処理: ユーザーが存在しない場合
+		}
+
 		console.log(requestBody); // Log the parsed body to verify the data
-		const session = await env.DB.prepare('SELECT * FROM User').bind().all();
-		return session.results;
+		const createGame = await env.DB.prepare(
+			'INSERT INTO GameSession (GameName, UserLimit, TimeLimit, GamePhase) VALUES (?, ?, ?, 0) RETURNING SessionId;'
+		)
+			.bind(requestBody.gameName, requestBody.userLimit, requestBody.timeLimit)
+			.run();
+		const sessionId = Array.isArray(createGame.results) && createGame.results[0]?.SessionId;
+		if (!sessionId) {
+			return { error: 'Failed to create game session: Session ID is missing' }; // セッションIDが取得できなかった場合のエラー処理
+		}
+
+		// ゲームの合言葉を生成
+		let entryWord: string;
+		do {
+			entryWord = Math.floor(10000 + Math.random() * 90000).toString();
+			const checkEntryWord = await env.DB.prepare('SELECT 1 FROM GameSessionEntryWord WHERE EntryWord = ?;').bind(entryWord).all();
+			if (checkEntryWord.results.length === 0) {
+				await env.DB.prepare('INSERT INTO GameSessionEntryWord (SessionId, EntryWord) VALUES (?, ?);').bind(sessionId, entryWord).run();
+				break;
+			}
+		} while (true);
+
+		// プレイヤーを登録
+		await env.DB.prepare('INSERT INTO GameSessionUser (SessionId, UserId) VALUES (?, ?);').bind(sessionId, userId).run();
+		await env.DB.prepare('INSERT INTO GameSessionUserInfo (SessionId, UserId, RandomNum, InGameUserName) VALUES (?, ?, ?, ?);')
+			.bind(sessionId, userId, Math.floor(100000 + Math.random() * 900000), requestBody.playerName)
+			.run();
+
+		return [{ SessionId: sessionId, EntryWord: entryWord }];
 	} catch (e: any) {
 		console.error('Error parsing JSON body:', e.message);
 		return { error: 'Invalid JSON body' };
 	}
-	// // const { sessionName, playerName, playerLimit, timeLimit } = requestBody;
+	// // const { gameName, playerName, userLimit, timeLimit } = requestBody;
 
 	// // Example: Log the received data
-	// console.log('Session Name:', sessionName);
+	// console.log('Session Name:', gameName);
 	// console.log('Player Name:', playerName);
-	// console.log('Player Limit:', playerLimit);
+	// console.log('Player Limit:', userLimit);
 	// console.log('Time Limit:', timeLimit);
 };
 

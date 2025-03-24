@@ -28,7 +28,11 @@ export default {
 				case '/api/random':
 					return Response.json(crypto.randomUUID());
 				case '/api/createGameSession':
-					return Response.json(await createGameSession(request, env));
+					const results = await createGameSession(request, env);
+					if (results.error) {
+						return Response.json(results.error, { status: 400, statusText: results.error });
+					}
+					return Response.json(results);
 				case '/api/getUserDatas':
 					return Response.json(await getUserDatas(request, env));
 				default:
