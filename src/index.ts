@@ -13,6 +13,7 @@
 
 import createGameSession from './createGameSession';
 import getUserDatas from './getUserDatas';
+import registerUser, { getUserName } from './userName';
 
 export interface Env {
 	DB: D1Database;
@@ -33,6 +34,12 @@ export default {
 						return Response.json(results.error, { status: 400, statusText: results.error });
 					}
 					return Response.json(results);
+				case '/api/registerUser':
+					const res = new Response();
+					await registerUser(request, env, res);
+					return res;
+				case '/api/getUserName':
+					return Response.json(await getUserName(request, env));
 				case '/api/getUserDatas':
 					return Response.json(await getUserDatas(request, env));
 				default:
