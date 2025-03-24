@@ -31,7 +31,7 @@ const createGameSession = async (request: Request, env: Env): Promise<any> => {
 		if (!validateRequestBody(requestBody)) {
 			return { error: 'Invalid request body' }; // リクエストボディが不正な場合のエラー処理
 		}
-		const userId = requestBody.userId ?? 1;
+		const userId = requestBody.userId ?? '';
 
 		// Check if the user exists in the User table
 		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(userId).all();
@@ -39,16 +39,13 @@ const createGameSession = async (request: Request, env: Env): Promise<any> => {
 			return { error: 'User does not exist' }; // エラー処理: ユーザーが存在しない場合
 		}
 
+		const sessionId: String = crypto.randomUUID();
 		console.log(requestBody); // Log the parsed body to verify the data
 		const createGame = await env.DB.prepare(
-			'INSERT INTO GameSession (GameName, UserLimit, TimeLimit, GamePhase) VALUES (?, ?, ?, 0) RETURNING SessionId;'
+			'INSERT INTO GameSession (SessionId, GameName, UserLimit, TimeLimit, GamePhase) VALUES (?, ?, ?, ?, 0);'
 		)
-			.bind(requestBody.gameName, requestBody.userLimit, requestBody.timeLimit)
+			.bind(sessionId, requestBody.gameName, requestBody.userLimit, requestBody.timeLimit)
 			.run();
-		const sessionId = Array.isArray(createGame.results) && createGame.results[0]?.SessionId;
-		if (!sessionId) {
-			return { error: 'Failed to create game session: Session ID is missing' }; // セッションIDが取得できなかった場合のエラー処理
-		}
 
 		// ゲームの合言葉を生成
 		let entryWord: string;
@@ -72,13 +69,6 @@ const createGameSession = async (request: Request, env: Env): Promise<any> => {
 		console.error('Error parsing JSON body:', e.message);
 		return { error: 'Invalid JSON body' };
 	}
-	// // const { gameName, playerName, userLimit, timeLimit } = requestBody;
-
-	// // Example: Log the received data
-	// console.log('Session Name:', gameName);
-	// console.log('Player Name:', playerName);
-	// console.log('Player Limit:', userLimit);
-	// console.log('Time Limit:', timeLimit);
 };
 
 export default createGameSession;
