@@ -12,6 +12,7 @@
  */
 
 import createGameSession from './createGameSession';
+import getSessionDatas from './getSessionDatas';
 import getUserDatas from './getUserDatas';
 import registerUser, { getUserName } from './userName';
 
@@ -40,6 +41,8 @@ export default {
 					return res;
 				case '/api/getUserName':
 					return Response.json(await getUserName(request, env));
+				case '/api/getSessionDatas':
+					return Response.json(await getSessionDatas(request, env));
 				case '/api/getUserDatas':
 					return Response.json(await getUserDatas(request, env));
 				default:
