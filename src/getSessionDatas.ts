@@ -29,7 +29,7 @@ export const getSessionId = async (req: Request, env: Env): Promise<any> => {
 		const data = await req.json();
 		const entryWord = (data as ReqPropsEntryWord).entryWord;
 
-		const session = await env.DB.prepare(`SELECT * FROM GameSessionEntryWord WHERE EntryWord = ?;`).bind(entryWord).all();
+		const session = await env.DB.prepare(`SELECT * FROM GameSession WHERE EntryWord = ?;`).bind(entryWord).all();
 		if (session.results.length === 0) {
 			return new Response(JSON.stringify({ error: 'No sessions found for the given entry word' }), { status: 404 });
 		}
