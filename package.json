@@ -17,6 +17,7 @@
 		"wrangler": "^4.3.0"
 	},
 	"dependencies": {
-		"express": "^4.21.2"
+		"express": "^4.21.2",
+		"hono": "^4.7.5"
 	}
 }

@@ -11,7 +11,9 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
+import { Hono } from 'hono';
 import createGameSession from './createGameSession';
+import { gameStream } from './gameStream';
 import { getSessionDatas, getSessionId } from './getSessionDatas';
 import getUserDatas from './getUserDatas';
 import registerUser, { getUserName } from './userName';
@@ -23,6 +25,8 @@ export interface Env {
 export default {
 	async fetch(request, env, ctx): Promise<Response> {
 		const url = new URL(request.url);
+		const app = new Hono();
+		gameStream(request, env, app);
 		try {
 			switch (url.pathname) {
 				case '/api/message':
@@ -36,9 +40,7 @@ export default {
 					}
 					return Response.json(results);
 				case '/api/registerUser':
-					const res = new Response();
-					await registerUser(request, env, res);
-					return res;
+					return Response.json(await registerUser(request, env));
 				case '/api/getUserName':
 					return Response.json(await getUserName(request, env));
 				case '/api/getSessionDatas':
@@ -48,7 +50,7 @@ export default {
 				case '/api/getUserDatas':
 					return Response.json(await getUserDatas(request, env));
 				default:
-					return Response.json('Not Found', { status: 404 });
+					return app.request(request); // Hono にリクエストを渡す
 			}
 		} catch (e: any) {
 			return Response.json(e.message, { status: 500 });

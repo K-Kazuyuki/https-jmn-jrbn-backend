@@ -1,25 +1,15 @@
 import { Env } from './index';
 
 type RequestBody = {
-	id: Text;
+	id: string;
 	name?: string;
-};
-
-const validateRequestBody = (body: any): body is RequestBody => {
-	return (
-		typeof body === 'object' && body !== null && typeof body.id === 'string' && (body.name === undefined || typeof body.name === 'string')
-	);
 };
 
 export const getUserName = async (request: Request, env: Env): Promise<any> => {
 	try {
-		const requestBody = await request.json();
-		if (!validateRequestBody(requestBody)) {
-			return { error: 'Invalid request body' };
-		}
-		const id = requestBody.id;
-		const user = await env.DB.prepare('SELECT Name FROM User WHERE UserId = ?;').bind(id).first();
-		if (user === undefined || user === null) {
+		const requestBody = (await request.json()) as RequestBody;
+		const user = await env.DB.prepare('SELECT Name FROM User WHERE UserId = ?;').bind(requestBody.id).first();
+		if (!user) {
 			return { error: 'User does not exist' };
 		}
 		return { name: user.Name };
@@ -29,28 +19,21 @@ export const getUserName = async (request: Request, env: Env): Promise<any> => {
 	}
 };
 
-const registerUser = async (req: Request, env: Env, res: Response) => {
+const registerUser = async (req: Request, env: Env): Promise<any> => {
 	try {
-		const requestBody = await req.json();
-		if (!validateRequestBody(requestBody)) {
-			res.status = 400;
-			res.statusText = 'Invalid request body';
-			return;
-		}
+		const requestBody = (await req.json()) as RequestBody;
 		const id = requestBody.id;
 		const name = requestBody.name ?? '';
 		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(id).all();
 		if (userExists.results.length === 0) {
-			await env.DB.prepare('INSERT INTO User (UserId, Name) VALUES (?, ?);').bind(id, name).run();
+			return await env.DB.prepare('INSERT INTO User (UserId, Name) VALUES (?, ?);').bind(id, name).run();
 		} else {
-			await env.DB.prepare('UPDATE User SET Name = ? WHERE UserId = ?;').bind(name, id).run();
+			return await env.DB.prepare('UPDATE User SET Name = ? WHERE UserId = ?;').bind(name, id).run();
 		}
-		res.status = 200;
-		res.statusText = 'OK';
 	} catch (error) {
 		console.error('Error registering user:', error);
-		res.status = 500;
-		res.statusText = 'Internal Server Error';
+		return { error: 'Internal Server Error', status: 500, ok: false };
 	}
 };
+
 export default registerUser;

@@ -9,14 +9,7 @@ export const getSessionDatas = async (req: Request, env: Env): Promise<any> => {
 		const data = await req.json();
 		const sessionId = (data as ReqProps).sessionId;
 
-		const session = await env.DB.prepare(
-			`SELECT *
-				FROM GameSession gs
-				JOIN GameSessionEntryWord gew ON gs.SessionId = gew.SessionId
-				WHERE gs.SessionId = ?;`
-		)
-			.bind(sessionId)
-			.all();
+		const session = await env.DB.prepare(`SELECT * FROM GameSession WHERE SessionId = ?;`).bind(sessionId).all();
 		if (session.results.length === 0) {
 			return new Response(JSON.stringify({ error: 'Session does not exist' }), { status: 404 });
 		}

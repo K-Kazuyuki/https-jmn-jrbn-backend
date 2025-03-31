@@ -1,7 +1,5 @@
-DROP TABLE IF EXISTS GameSessionUserInfo;
 DROP TABLE IF EXISTS GameSessionUser;
 DROP TABLE IF EXISTS User;
-DROP TABLE IF EXISTS GameSessionEntryWord;
 DROP TABLE IF EXISTS GameSession;
 
 CREATE TABLE GameSession (
@@ -9,14 +7,8 @@ CREATE TABLE GameSession (
 	GameName TEXT,
 	UserLimit INTEGER,
 	TimeLimit INTEGER,
-	GamePhase INTEGER
-);
-
-CREATE TABLE GameSessionEntryWord (
-	SessionId TEXT,
-	EntryWord TEXT,
-	PRIMARY KEY (SessionId),
-	FOREIGN KEY (SessionId) REFERENCES GameSession(SessionId)
+	GamePhase INTEGER,
+	EntryWord TEXT
 );
 
 CREATE TABLE User (
@@ -26,15 +18,7 @@ CREATE TABLE User (
 
 CREATE TABLE GameSessionUser (
 	SessionId TEXT,
-	UserId INTEGER,
-	PRIMARY KEY (SessionId, UserId),
-	FOREIGN KEY (SessionId) REFERENCES GameSession(SessionId),
-	FOREIGN KEY (UserId) REFERENCES User(UserId)
-);
-
-CREATE TABLE GameSessionUserInfo (
-	SessionId TEXT,
-	UserId INTEGER,
+	UserId TEXT,
 	RandomNum INTEGER,
 	InGameUserName TEXT,
 	PRIMARY KEY (SessionId, UserId),
