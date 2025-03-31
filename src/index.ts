@@ -17,6 +17,7 @@ import { gameStream } from './gameStream';
 import { getSessionDatas, getSessionId } from './getSessionDatas';
 import getUserDatas from './getUserDatas';
 import registerUser, { getUserName } from './userName';
+import joinUser from './joinUser';
 
 export interface Env {
 	DB: D1Database;
@@ -49,6 +50,21 @@ export default {
 					return Response.json(await getSessionId(request, env));
 				case '/api/getUserDatas':
 					return Response.json(await getUserDatas(request, env));
+				case '/api/joinUser':
+					const joinUserParam = (await request.json()) as {
+						sessionId: string;
+						userId: string;
+						playerName: string;
+					};
+					if (!joinUserParam) {
+						return Response.json('Invalid request body', { status: 400 });
+					}
+					try {
+						await joinUser(joinUserParam, env);
+						return Response.json('User joined successfully');
+					} catch (e: any) {
+						return Response.json(e.message, { status: 400 });
+					}
 				default:
 					return app.request(request); // Hono にリクエストを渡す
 			}
