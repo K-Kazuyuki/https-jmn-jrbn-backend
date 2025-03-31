@@ -16,11 +16,12 @@ const createGameSession = async (request: Request, env: Env): Promise<any> => {
 			return { error: 'Request body is empty' }; // リクエストボディが空の場合のエラー処理
 		}
 		const requestBody = (await request.json()) as RequestBody; // Parse the JSON body
-		const userId = requestBody.userId ?? '';
+		const userId = requestBody.userId;
 
 		// Check if the user exists in the User table
 		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(userId).all();
 		if (userExists.results.length === 0) {
+			console.error('User does not exist:', userId);
 			return { error: 'User does not exist' }; // エラー処理: ユーザーが存在しない場合
 		}
 
