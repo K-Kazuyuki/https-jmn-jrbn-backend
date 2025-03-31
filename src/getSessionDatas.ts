@@ -1,25 +1,49 @@
 import { Env } from './index';
 
-type reqProps = {
+type ReqProps = {
 	sessionId: string;
 };
 
-const getSessionDatas = async (req: Request, env: Env): Promise<Response> => {
+export const getSessionDatas = async (req: Request, env: Env): Promise<any> => {
 	try {
 		const data = await req.json();
-		const sessionId = (data as reqProps).sessionId;
+		const sessionId = (data as ReqProps).sessionId;
 
-		const session = await env.DB.prepare('SELECT * FROM GameSession WHERE SessionId = ?;').bind(sessionId).all();
+		const session = await env.DB.prepare(
+			`SELECT *
+				FROM GameSession gs
+				JOIN GameSessionEntryWord gew ON gs.SessionId = gew.SessionId
+				WHERE gs.SessionId = ?;`
+		)
+			.bind(sessionId)
+			.all();
 		if (session.results.length === 0) {
 			return new Response(JSON.stringify({ error: 'Session does not exist' }), { status: 404 });
 		}
-		const sessionData = session.results[0];
-		console.log('Session data:', sessionData);
-
-		return new Response(JSON.stringify({ sessionData }), { status: 200 });
+		console.log('Session data:', session.results);
+		return session.results;
 	} catch (e: any) {
 		return new Response(JSON.stringify({ error: e.message }), { status: 500 });
 	}
 };
 
-export default getSessionDatas;
+type ReqPropsEntryWord = {
+	entryWord: string;
+};
+
+export const getSessionId = async (req: Request, env: Env): Promise<any> => {
+	try {
+		const data = await req.json();
+		const entryWord = (data as ReqPropsEntryWord).entryWord;
+
+		const session = await env.DB.prepare(`SELECT * FROM GameSessionEntryWord WHERE EntryWord = ?;`).bind(entryWord).all();
+		if (session.results.length === 0) {
+			return new Response(JSON.stringify({ error: 'No sessions found for the given entry word' }), { status: 404 });
+		}
+		console.log('Session data by entry word:', session.results);
+		return session.results;
+	} catch (e: any) {
+		return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+	}
+};
+export default { getSessionDatas, getSessionId };

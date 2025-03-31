@@ -8,29 +8,13 @@ type RequestBody = {
 	userId?: number;
 };
 
-const validateRequestBody = (body: any): body is RequestBody => {
-	// gameName と playerName のインジェクション
-	return (
-		typeof body === 'object' &&
-		body !== null &&
-		typeof body.gameName === 'string' &&
-		typeof body.playerName === 'string' &&
-		typeof body.userLimit === 'number' &&
-		typeof body.timeLimit === 'number' &&
-		(body.userId === undefined || typeof body.userId === 'number')
-	);
-};
-
 const createGameSession = async (request: Request, env: Env): Promise<any> => {
 	try {
 		console.log('Request body:', request.body); // Log the raw body to verify the data
 		if (request.body === null) {
 			return { error: 'Request body is empty' }; // リクエストボディが空の場合のエラー処理
 		}
-		const requestBody = await request.json(); // Parse the JSON body
-		if (!validateRequestBody(requestBody)) {
-			return { error: 'Invalid request body' }; // リクエストボディが不正な場合のエラー処理
-		}
+		const requestBody = (await request.json()) as RequestBody; // Parse the JSON body
 		const userId = requestBody.userId ?? '';
 
 		// Check if the user exists in the User table
