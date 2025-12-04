@@ -1,61 +1,107 @@
-import { Env } from './index';
-import joinUser from './joinUser';
+import { Env, ApiResponse } from './types';
 
-type RequestBody = {
+interface CreateGameSessionRequest {
 	gameName: string;
 	playerName: string;
 	userLimit: number;
 	timeLimit: number;
 	userId: string;
+	progressMode?: 'all_ready' | 'time_limit';
+}
+
+interface CreateGameSessionResponse {
+	sessionId: string;
+	entryWord: string;
+}
+
+const validateRequestBody = (body: any): body is CreateGameSessionRequest => {
+	return (
+		typeof body === 'object' &&
+		body !== null &&
+		typeof body.gameName === 'string' &&
+		body.gameName.trim() !== '' &&
+		typeof body.playerName === 'string' &&
+		body.playerName.trim() !== '' &&
+		typeof body.userLimit === 'number' &&
+		body.userLimit >= 2 &&
+		body.userLimit <= 10 &&
+		typeof body.timeLimit === 'number' &&
+		body.timeLimit >= 1 &&
+		typeof body.userId === 'string'
+	);
 };
 
-const createGameSession = async (request: Request, env: Env): Promise<any> => {
+const createGameSession = async (request: Request, env: Env): Promise<ApiResponse<CreateGameSessionResponse>> => {
 	try {
-		console.log('Request body:', request.body); // Log the raw body to verify the data
 		if (request.body === null) {
-			return { error: 'Request body is empty' }; // リクエストボディが空の場合のエラー処理
+			return { success: false, error: 'Request body is empty' };
 		}
-		const requestBody = (await request.json()) as RequestBody; // Parse the JSON body
+
+		const requestBody = await request.json();
+		if (!validateRequestBody(requestBody)) {
+			return { success: false, error: 'Invalid request body' };
+		}
+
 		const userId = requestBody.userId;
+		const progressMode = requestBody.progressMode || 'all_ready';
+		const sessionId = crypto.randomUUID();
+		const now = new Date().toISOString();
 
-		// Check if the user exists in the User table
-		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(userId).all();
-		if (userExists.results.length === 0) {
-			console.error('User does not exist:', userId);
-			return { error: 'User does not exist' }; // エラー処理: ユーザーが存在しない場合
+		// ユーザーの存在確認（存在しない場合は自動作成）
+		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?').bind(userId).first();
+		if (!userExists) {
+			await env.DB.prepare('INSERT INTO User (UserId, Name, CreatedAt) VALUES (?, ?, ?)')
+				.bind(userId, requestBody.playerName.trim(), now)
+				.run();
 		}
 
-		const sessionId: string = crypto.randomUUID();
-		console.log(requestBody); // Log the parsed body to verify the data
-		// ゲームの合言葉を生成
-		let entryWord: string;
-		do {
-			entryWord = Math.random().toString(36).substring(2, 7).toUpperCase();
-			// EntryWordが重複しないか確認
-			const checkEntryWord = await env.DB.prepare('SELECT 1 FROM GameSession WHERE EntryWord = ?;').bind(entryWord).all();
-			if (checkEntryWord.results.length === 0) {
-				break;
-			}
-		} while (true);
-		const createGame = await env.DB.prepare(
-			'INSERT INTO GameSession (SessionId, GameName, UserLimit, TimeLimit, GamePhase, EntryWord) VALUES (?, ?, ?, ?, 0, ?);'
+		// ゲームセッション作成
+		await env.DB.prepare(
+			`INSERT INTO GameSession (SessionId, GameName, UserLimit, TimeLimit, GamePhase, CurrentRound, ProgressMode, CreatedAt)
+			 VALUES (?, ?, ?, ?, 0, 0, ?, ?)`
 		)
-			.bind(sessionId, requestBody.gameName, requestBody.userLimit, requestBody.timeLimit, entryWord)
+			.bind(sessionId, requestBody.gameName.trim(), requestBody.userLimit, requestBody.timeLimit, progressMode, now)
 			.run();
 
-		joinUser(
-			{
-				sessionId: sessionId,
-				userId: userId,
-				playerName: requestBody.playerName,
-			},
-			env
-		);
+		// 合言葉を生成（5桁のユニークな数字）
+		let entryWord: string;
+		let attempts = 0;
+		do {
+			entryWord = Math.floor(10000 + Math.random() * 90000).toString();
+			const existing = await env.DB.prepare('SELECT 1 FROM GameSessionEntryWord WHERE EntryWord = ?').bind(entryWord).first();
+			if (!existing) {
+				await env.DB.prepare('INSERT INTO GameSessionEntryWord (SessionId, EntryWord) VALUES (?, ?)').bind(sessionId, entryWord).run();
+				break;
+			}
+			attempts++;
+		} while (attempts < 100);
 
-		return [{ SessionId: sessionId, EntryWord: entryWord }];
+		if (attempts >= 100) {
+			return { success: false, error: 'Failed to generate unique entry word' };
+		}
+
+		// 作成者を参加者として登録
+		await env.DB.prepare(
+			`INSERT INTO GameSessionUser (SessionId, UserId, JoinOrder, LastActiveAt, IsActive)
+			 VALUES (?, ?, 1, ?, 1)`
+		)
+			.bind(sessionId, userId, now)
+			.run();
+
+		await env.DB.prepare(
+			`INSERT INTO GameSessionUserInfo (SessionId, UserId, InGameUserName)
+			 VALUES (?, ?, ?)`
+		)
+			.bind(sessionId, userId, requestBody.playerName.trim())
+			.run();
+
+		return {
+			success: true,
+			data: { sessionId, entryWord },
+		};
 	} catch (e: any) {
-		console.error('Error parsing JSON body:', e.message);
-		return { error: 'Invalid JSON body' };
+		console.error('Error creating game session:', e.message);
+		return { success: false, error: e.message };
 	}
 };
 

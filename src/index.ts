@@ -1,75 +1,116 @@
 /**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
+ * じゃれぼん バックエンドAPI
+ * Cloudflare Workers + D1
  */
 
-import { Hono } from 'hono';
+import { Env } from './types';
 import createGameSession from './createGameSession';
-import { gameStream } from './gameStream';
-import { getSessionDatas, getSessionId } from './getSessionDatas';
-import getUserDatas from './getUserDatas';
+import joinGameSession from './joinGameSession';
+import startGame from './startGame';
+import getGameStatus from './getGameStatus';
+import getSessionDatas from './getSessionDatas';
+import submitText from './submitText';
+import markReady, { checkTimeLimit } from './markReady';
+import { getUserHistory, getSessionStories } from './getUserHistory';
 import registerUser, { getUserName } from './userName';
-import joinUser from './joinUser';
+import { getSettingsApi, updateSettingsApi } from './settings';
 
-export interface Env {
-	DB: D1Database;
-}
+export type { Env };
 
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
-		const app = new Hono();
-		gameStream(request, env, app);
+
+		// CORS headers
+		const corsHeaders = {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type',
+		};
+
+		// Handle preflight
+		if (request.method === 'OPTIONS') {
+			return new Response(null, { headers: corsHeaders });
+		}
+
 		try {
+			let result: any;
+
 			switch (url.pathname) {
-				case '/api/message':
-					return Response.json('Hello, World!');
-				case '/api/random':
-					return Response.json(crypto.randomUUID());
-				case '/api/createGameSession':
-					const results = await createGameSession(request, env);
-					if (results.error) {
-						return Response.json(results.error, { status: 400, statusText: results.error });
-					}
-					return Response.json(results);
+				// ユーザー管理
 				case '/api/registerUser':
-					return Response.json(await registerUser(request, env));
+					result = await registerUser(request, env);
+					break;
+
 				case '/api/getUserName':
-					return Response.json(await getUserName(request, env));
+					result = await getUserName(request, env);
+					break;
+
+				// ゲームセッション管理
+				case '/api/createGameSession':
+					result = await createGameSession(request, env);
+					break;
+
+				case '/api/joinGameSession':
+					result = await joinGameSession(request, env);
+					break;
+
+				case '/api/startGame':
+					result = await startGame(request, env);
+					break;
+
 				case '/api/getSessionDatas':
-					return Response.json(await getSessionDatas(request, env));
-				case '/api/getSessionId':
-					return Response.json(await getSessionId(request, env));
-				case '/api/getUserDatas':
-					return Response.json(await getUserDatas(request, env));
-				case '/api/joinUser':
-					const joinUserParam = (await request.json()) as {
-						sessionId: string;
-						userId: string;
-						playerName: string;
-					};
-					if (!joinUserParam) {
-						return Response.json('Invalid request body', { status: 400 });
-					}
-					try {
-						await joinUser(joinUserParam, env);
-						return Response.json('User joined successfully');
-					} catch (e: any) {
-						return Response.json(e.message, { status: 400 });
-					}
+					result = await getSessionDatas(request, env);
+					break;
+
+				// ゲームプレイ
+				case '/api/getGameStatus':
+					result = await getGameStatus(request, env);
+					break;
+
+				case '/api/submitText':
+					result = await submitText(request, env);
+					break;
+
+				case '/api/markReady':
+					result = await markReady(request, env);
+					break;
+
+				// 履歴・プロフィール
+				case '/api/getUserHistory':
+					result = await getUserHistory(request, env);
+					break;
+
+				case '/api/getSessionStories':
+					result = await getSessionStories(request, env);
+					break;
+
+				// 設定
+				case '/api/getSettings':
+					result = await getSettingsApi(request, env);
+					break;
+
+				case '/api/updateSettings':
+					result = await updateSettingsApi(request, env);
+					break;
+
+				// テスト用
+				case '/api/message':
+					result = { success: true, data: 'Hello, じゃれぼん!' };
+					break;
+
+				case '/api/random':
+					result = { success: true, data: crypto.randomUUID() };
+					break;
+
 				default:
-					return app.request(request); // Hono にリクエストを渡す
+					return Response.json({ success: false, error: 'Not Found' }, { status: 404, headers: corsHeaders });
 			}
+
+			return Response.json(result, { headers: corsHeaders });
 		} catch (e: any) {
-			return Response.json(e.message, { status: 500 });
+			console.error('Unhandled error:', e.message);
+			return Response.json({ success: false, error: e.message }, { status: 500, headers: corsHeaders });
 		}
 	},
 } satisfies ExportedHandler<Env>;

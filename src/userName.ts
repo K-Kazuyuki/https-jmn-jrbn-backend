@@ -1,38 +1,67 @@
-import { Env } from './index';
+import { Env, ApiResponse } from './types';
 
-type RequestBody = {
+interface RegisterUserRequest {
 	id: string;
 	name?: string;
+}
+
+interface GetUserNameRequest {
+	id: string;
+}
+
+const validateRegisterRequest = (body: any): body is RegisterUserRequest => {
+	return (
+		typeof body === 'object' && body !== null && typeof body.id === 'string' && (body.name === undefined || typeof body.name === 'string')
+	);
 };
 
-export const getUserName = async (request: Request, env: Env): Promise<any> => {
+const validateGetUserNameRequest = (body: any): body is GetUserNameRequest => {
+	return typeof body === 'object' && body !== null && typeof body.id === 'string';
+};
+
+export const getUserName = async (request: Request, env: Env): Promise<ApiResponse<{ name: string }>> => {
 	try {
-		const requestBody = (await request.json()) as RequestBody;
-		const user = await env.DB.prepare('SELECT Name FROM User WHERE UserId = ?;').bind(requestBody.id).first();
-		if (!user) {
-			return { error: 'User does not exist' };
+		const requestBody = await request.json();
+		if (!validateGetUserNameRequest(requestBody)) {
+			return { success: false, error: 'Invalid request body' };
 		}
-		return { name: user.Name };
-	} catch (error) {
+
+		const { id } = requestBody;
+		const user = await env.DB.prepare('SELECT Name FROM User WHERE UserId = ?').bind(id).first<{ Name: string }>();
+
+		if (!user) {
+			return { success: false, error: 'User does not exist' };
+		}
+
+		return { success: true, data: { name: user.Name } };
+	} catch (error: any) {
 		console.error('Error getting user name:', error);
-		return { error: 'Internal Server Error' };
+		return { success: false, error: 'Internal Server Error' };
 	}
 };
 
-const registerUser = async (req: Request, env: Env): Promise<any> => {
+const registerUser = async (request: Request, env: Env): Promise<ApiResponse> => {
 	try {
-		const requestBody = (await req.json()) as RequestBody;
-		const id = requestBody.id;
-		const name = requestBody.name ?? '';
-		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?;').bind(id).all();
-		if (userExists.results.length === 0) {
-			return await env.DB.prepare('INSERT INTO User (UserId, Name) VALUES (?, ?);').bind(id, name).run();
-		} else {
-			return await env.DB.prepare('UPDATE User SET Name = ? WHERE UserId = ?;').bind(name, id).run();
+		const requestBody = await request.json();
+		if (!validateRegisterRequest(requestBody)) {
+			return { success: false, error: 'Invalid request body' };
 		}
-	} catch (error) {
+
+		const { id, name = '' } = requestBody;
+		const now = new Date().toISOString();
+
+		const userExists = await env.DB.prepare('SELECT 1 FROM User WHERE UserId = ?').bind(id).first();
+
+		if (!userExists) {
+			await env.DB.prepare('INSERT INTO User (UserId, Name, CreatedAt) VALUES (?, ?, ?)').bind(id, name, now).run();
+		} else {
+			await env.DB.prepare('UPDATE User SET Name = ? WHERE UserId = ?').bind(name, id).run();
+		}
+
+		return { success: true };
+	} catch (error: any) {
 		console.error('Error registering user:', error);
-		return { error: 'Internal Server Error', status: 500, ok: false };
+		return { success: false, error: 'Internal Server Error' };
 	}
 };
 
